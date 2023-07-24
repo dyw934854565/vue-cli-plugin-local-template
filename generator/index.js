@@ -4,13 +4,11 @@ const inquirer = require('inquirer');
 const templateRelativePath = './template';
 const ejs = require('ejs');
 const fs = require('fs');
+const getTemplatePath = require('../utils.js');
 module.exports = (api, options) => {
   const templatePath = api.resolve(templateRelativePath);
-  console.log('templatePath', templatePath);
 
-  const pluginPath = templatePath;
-
-  function getAnswers() {
+  function getAnswers(pluginPath) {
     const options = {};
     try {
       const prompts = require(path.resolve(pluginPath, 'prompts.js'))
@@ -20,21 +18,23 @@ module.exports = (api, options) => {
     }
   }
 
-  return getAnswers().then(answers => {
+  return getTemplatePath(templatePath, '', ['./prompts.js', './generator/index.js']).then((pluginPath) => {
+    return getAnswers(pluginPath).then(answers => {
 
-    // 模版新文件支持变量名，已存在文件不修改
-    api.postProcessFiles((files) => {
-      Object.keys(files).forEach((name) => {
-        if (fs.existsSync(path.resolve(process.cwd(), name))) {
-          return;
-        }
-        const content = files[name];
-        delete files[name];
-        const targetName = ejs.render(name, answers);
-        files[targetName] = content;
+      // 模版新文件支持变量名，已存在文件不修改
+      api.postProcessFiles((files) => {
+        Object.keys(files).forEach((name) => {
+          if (fs.existsSync(path.resolve(process.cwd(), name))) {
+            return;
+          }
+          const content = files[name];
+          delete files[name];
+          const targetName = ejs.render(name, answers);
+          files[targetName] = content;
+        });
       });
+      const generator = require(path.resolve(pluginPath, 'generator/index.js'));
+      return generator(api, answers);
     });
-    const generator = require(path.resolve(pluginPath, 'generator/index.js'));
-    return generator(api, answers);
-  })
+  });
 }
